@@ -49,13 +49,19 @@ type SpawnerServiceClient interface {
 	// Delete Vol
 	DeleteVolume(ctx context.Context, in *DeleteVolumeRequest, opts ...grpc.CallOption) (*DeleteVolumeResponse, error)
 	CreateSnapshot(ctx context.Context, in *CreateSnapshotRequest, opts ...grpc.CallOption) (*CreateSnapshotResponse, error)
+	DeleteSnapshot(ctx context.Context, in *DeleteSnapshotRequest, opts ...grpc.CallOption) (*DeleteSnapshotResponse, error)
 	CreateSnapshotAndDelete(ctx context.Context, in *CreateSnapshotAndDeleteRequest, opts ...grpc.CallOption) (*CreateSnapshotAndDeleteResponse, error)
 	RegisterWithRancher(ctx context.Context, in *RancherRegistrationRequest, opts ...grpc.CallOption) (*RancherRegistrationResponse, error)
+	// Deprecated: Do not use.
 	GetWorkspacesCost(ctx context.Context, in *GetWorkspacesCostRequest, opts ...grpc.CallOption) (*GetWorkspacesCostResponse, error)
+	GetApplicationsCost(ctx context.Context, in *GetApplicationsCostRequest, opts ...grpc.CallOption) (*GetApplicationsCostResponse, error)
 	WriteCredential(ctx context.Context, in *WriteCredentialRequest, opts ...grpc.CallOption) (*WriteCredentialResponse, error)
 	ReadCredential(ctx context.Context, in *ReadCredentialRequest, opts ...grpc.CallOption) (*ReadCredentialResponse, error)
 	GetKubeConfig(ctx context.Context, in *GetKubeConfigRequest, opts ...grpc.CallOption) (*GetKubeConfigResponse, error)
 	TagNodeInstance(ctx context.Context, in *TagNodeInstanceRequest, opts ...grpc.CallOption) (*TagNodeInstanceResponse, error)
+	GetCostByTime(ctx context.Context, in *GetCostByTimeRequest, opts ...grpc.CallOption) (*GetCostByTimeResponse, error)
+	GetContainerRegistryAuth(ctx context.Context, in *GetContainerRegistryAuthRequest, opts ...grpc.CallOption) (*GetContainerRegistryAuthResponse, error)
+	CreateContainerRegistryRepo(ctx context.Context, in *CreateContainerRegistryRepoRequest, opts ...grpc.CallOption) (*CreateContainerRegistryRepoResponse, error)
 }
 
 type spawnerServiceClient struct {
@@ -201,6 +207,15 @@ func (c *spawnerServiceClient) CreateSnapshot(ctx context.Context, in *CreateSna
 	return out, nil
 }
 
+func (c *spawnerServiceClient) DeleteSnapshot(ctx context.Context, in *DeleteSnapshotRequest, opts ...grpc.CallOption) (*DeleteSnapshotResponse, error) {
+	out := new(DeleteSnapshotResponse)
+	err := c.cc.Invoke(ctx, "/spawner.SpawnerService/DeleteSnapshot", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *spawnerServiceClient) CreateSnapshotAndDelete(ctx context.Context, in *CreateSnapshotAndDeleteRequest, opts ...grpc.CallOption) (*CreateSnapshotAndDeleteResponse, error) {
 	out := new(CreateSnapshotAndDeleteResponse)
 	err := c.cc.Invoke(ctx, "/spawner.SpawnerService/CreateSnapshotAndDelete", in, out, opts...)
@@ -219,9 +234,19 @@ func (c *spawnerServiceClient) RegisterWithRancher(ctx context.Context, in *Ranc
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *spawnerServiceClient) GetWorkspacesCost(ctx context.Context, in *GetWorkspacesCostRequest, opts ...grpc.CallOption) (*GetWorkspacesCostResponse, error) {
 	out := new(GetWorkspacesCostResponse)
 	err := c.cc.Invoke(ctx, "/spawner.SpawnerService/GetWorkspacesCost", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *spawnerServiceClient) GetApplicationsCost(ctx context.Context, in *GetApplicationsCostRequest, opts ...grpc.CallOption) (*GetApplicationsCostResponse, error) {
+	out := new(GetApplicationsCostResponse)
+	err := c.cc.Invoke(ctx, "/spawner.SpawnerService/GetApplicationsCost", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -264,6 +289,33 @@ func (c *spawnerServiceClient) TagNodeInstance(ctx context.Context, in *TagNodeI
 	return out, nil
 }
 
+func (c *spawnerServiceClient) GetCostByTime(ctx context.Context, in *GetCostByTimeRequest, opts ...grpc.CallOption) (*GetCostByTimeResponse, error) {
+	out := new(GetCostByTimeResponse)
+	err := c.cc.Invoke(ctx, "/spawner.SpawnerService/GetCostByTime", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *spawnerServiceClient) GetContainerRegistryAuth(ctx context.Context, in *GetContainerRegistryAuthRequest, opts ...grpc.CallOption) (*GetContainerRegistryAuthResponse, error) {
+	out := new(GetContainerRegistryAuthResponse)
+	err := c.cc.Invoke(ctx, "/spawner.SpawnerService/GetContainerRegistryAuth", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *spawnerServiceClient) CreateContainerRegistryRepo(ctx context.Context, in *CreateContainerRegistryRepoRequest, opts ...grpc.CallOption) (*CreateContainerRegistryRepoResponse, error) {
+	out := new(CreateContainerRegistryRepoResponse)
+	err := c.cc.Invoke(ctx, "/spawner.SpawnerService/CreateContainerRegistryRepo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SpawnerServiceServer is the server API for SpawnerService service.
 // All implementations must embed UnimplementedSpawnerServiceServer
 // for forward compatibility
@@ -295,13 +347,19 @@ type SpawnerServiceServer interface {
 	// Delete Vol
 	DeleteVolume(context.Context, *DeleteVolumeRequest) (*DeleteVolumeResponse, error)
 	CreateSnapshot(context.Context, *CreateSnapshotRequest) (*CreateSnapshotResponse, error)
+	DeleteSnapshot(context.Context, *DeleteSnapshotRequest) (*DeleteSnapshotResponse, error)
 	CreateSnapshotAndDelete(context.Context, *CreateSnapshotAndDeleteRequest) (*CreateSnapshotAndDeleteResponse, error)
 	RegisterWithRancher(context.Context, *RancherRegistrationRequest) (*RancherRegistrationResponse, error)
+	// Deprecated: Do not use.
 	GetWorkspacesCost(context.Context, *GetWorkspacesCostRequest) (*GetWorkspacesCostResponse, error)
+	GetApplicationsCost(context.Context, *GetApplicationsCostRequest) (*GetApplicationsCostResponse, error)
 	WriteCredential(context.Context, *WriteCredentialRequest) (*WriteCredentialResponse, error)
 	ReadCredential(context.Context, *ReadCredentialRequest) (*ReadCredentialResponse, error)
 	GetKubeConfig(context.Context, *GetKubeConfigRequest) (*GetKubeConfigResponse, error)
 	TagNodeInstance(context.Context, *TagNodeInstanceRequest) (*TagNodeInstanceResponse, error)
+	GetCostByTime(context.Context, *GetCostByTimeRequest) (*GetCostByTimeResponse, error)
+	GetContainerRegistryAuth(context.Context, *GetContainerRegistryAuthRequest) (*GetContainerRegistryAuthResponse, error)
+	CreateContainerRegistryRepo(context.Context, *CreateContainerRegistryRepoRequest) (*CreateContainerRegistryRepoResponse, error)
 	mustEmbedUnimplementedSpawnerServiceServer()
 }
 
@@ -354,6 +412,9 @@ func (UnimplementedSpawnerServiceServer) DeleteVolume(context.Context, *DeleteVo
 func (UnimplementedSpawnerServiceServer) CreateSnapshot(context.Context, *CreateSnapshotRequest) (*CreateSnapshotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSnapshot not implemented")
 }
+func (UnimplementedSpawnerServiceServer) DeleteSnapshot(context.Context, *DeleteSnapshotRequest) (*DeleteSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSnapshot not implemented")
+}
 func (UnimplementedSpawnerServiceServer) CreateSnapshotAndDelete(context.Context, *CreateSnapshotAndDeleteRequest) (*CreateSnapshotAndDeleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSnapshotAndDelete not implemented")
 }
@@ -362,6 +423,9 @@ func (UnimplementedSpawnerServiceServer) RegisterWithRancher(context.Context, *R
 }
 func (UnimplementedSpawnerServiceServer) GetWorkspacesCost(context.Context, *GetWorkspacesCostRequest) (*GetWorkspacesCostResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetWorkspacesCost not implemented")
+}
+func (UnimplementedSpawnerServiceServer) GetApplicationsCost(context.Context, *GetApplicationsCostRequest) (*GetApplicationsCostResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetApplicationsCost not implemented")
 }
 func (UnimplementedSpawnerServiceServer) WriteCredential(context.Context, *WriteCredentialRequest) (*WriteCredentialResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteCredential not implemented")
@@ -374,6 +438,15 @@ func (UnimplementedSpawnerServiceServer) GetKubeConfig(context.Context, *GetKube
 }
 func (UnimplementedSpawnerServiceServer) TagNodeInstance(context.Context, *TagNodeInstanceRequest) (*TagNodeInstanceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TagNodeInstance not implemented")
+}
+func (UnimplementedSpawnerServiceServer) GetCostByTime(context.Context, *GetCostByTimeRequest) (*GetCostByTimeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCostByTime not implemented")
+}
+func (UnimplementedSpawnerServiceServer) GetContainerRegistryAuth(context.Context, *GetContainerRegistryAuthRequest) (*GetContainerRegistryAuthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetContainerRegistryAuth not implemented")
+}
+func (UnimplementedSpawnerServiceServer) CreateContainerRegistryRepo(context.Context, *CreateContainerRegistryRepoRequest) (*CreateContainerRegistryRepoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateContainerRegistryRepo not implemented")
 }
 func (UnimplementedSpawnerServiceServer) mustEmbedUnimplementedSpawnerServiceServer() {}
 
@@ -658,6 +731,24 @@ func _SpawnerService_CreateSnapshot_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SpawnerService_DeleteSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpawnerServiceServer).DeleteSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/spawner.SpawnerService/DeleteSnapshot",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpawnerServiceServer).DeleteSnapshot(ctx, req.(*DeleteSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SpawnerService_CreateSnapshotAndDelete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateSnapshotAndDeleteRequest)
 	if err := dec(in); err != nil {
@@ -708,6 +799,24 @@ func _SpawnerService_GetWorkspacesCost_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SpawnerServiceServer).GetWorkspacesCost(ctx, req.(*GetWorkspacesCostRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SpawnerService_GetApplicationsCost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetApplicationsCostRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpawnerServiceServer).GetApplicationsCost(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/spawner.SpawnerService/GetApplicationsCost",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpawnerServiceServer).GetApplicationsCost(ctx, req.(*GetApplicationsCostRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -784,6 +893,60 @@ func _SpawnerService_TagNodeInstance_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SpawnerService_GetCostByTime_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCostByTimeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpawnerServiceServer).GetCostByTime(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/spawner.SpawnerService/GetCostByTime",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpawnerServiceServer).GetCostByTime(ctx, req.(*GetCostByTimeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SpawnerService_GetContainerRegistryAuth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetContainerRegistryAuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpawnerServiceServer).GetContainerRegistryAuth(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/spawner.SpawnerService/GetContainerRegistryAuth",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpawnerServiceServer).GetContainerRegistryAuth(ctx, req.(*GetContainerRegistryAuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SpawnerService_CreateContainerRegistryRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateContainerRegistryRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SpawnerServiceServer).CreateContainerRegistryRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/spawner.SpawnerService/CreateContainerRegistryRepo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SpawnerServiceServer).CreateContainerRegistryRepo(ctx, req.(*CreateContainerRegistryRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SpawnerService_ServiceDesc is the grpc.ServiceDesc for SpawnerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -852,6 +1015,10 @@ var SpawnerService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SpawnerService_CreateSnapshot_Handler,
 		},
 		{
+			MethodName: "DeleteSnapshot",
+			Handler:    _SpawnerService_DeleteSnapshot_Handler,
+		},
+		{
 			MethodName: "CreateSnapshotAndDelete",
 			Handler:    _SpawnerService_CreateSnapshotAndDelete_Handler,
 		},
@@ -862,6 +1029,10 @@ var SpawnerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetWorkspacesCost",
 			Handler:    _SpawnerService_GetWorkspacesCost_Handler,
+		},
+		{
+			MethodName: "GetApplicationsCost",
+			Handler:    _SpawnerService_GetApplicationsCost_Handler,
 		},
 		{
 			MethodName: "WriteCredential",
@@ -878,6 +1049,18 @@ var SpawnerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TagNodeInstance",
 			Handler:    _SpawnerService_TagNodeInstance_Handler,
+		},
+		{
+			MethodName: "GetCostByTime",
+			Handler:    _SpawnerService_GetCostByTime_Handler,
+		},
+		{
+			MethodName: "GetContainerRegistryAuth",
+			Handler:    _SpawnerService_GetContainerRegistryAuth_Handler,
+		},
+		{
+			MethodName: "CreateContainerRegistryRepo",
+			Handler:    _SpawnerService_CreateContainerRegistryRepo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

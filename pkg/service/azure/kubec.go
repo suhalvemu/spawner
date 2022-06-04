@@ -11,7 +11,7 @@ import (
 	"k8s.io/kops/pkg/kubeconfig"
 )
 
-func (a *AzureController) kubeConfig(ctx context.Context, req *proto.GetKubeConfigRequest) ([]byte, error) {
+func (a *azureController) kubeConfig(ctx context.Context, req *proto.GetKubeConfigRequest) ([]byte, error) {
 
 	account := req.AccountName
 
@@ -32,17 +32,17 @@ func (a *AzureController) kubeConfig(ctx context.Context, req *proto.GetKubeConf
 		aksClient.ListClusterUserCredentials(ctx, groupName, clusterName, fqdn, containerservice.FormatAzure)
 
 	if err != nil {
-		a.logger.Errorw("failed to get kube config", "error", err)
+		a.logger.Error(ctx, "failed to get kube config", "error", err)
 		return nil, err
 	}
 
 	if len(*res.Kubeconfigs) > 1 {
-		a.logger.Warnw("got kube config", len(*res.Kubeconfigs))
+		a.logger.Warn(ctx, "got kube config", len(*res.Kubeconfigs))
 	}
 	return *(*res.Kubeconfigs)[0].Value, nil
 }
 
-func (a *AzureController) getToken(ctx context.Context, req *proto.GetTokenRequest) (*proto.GetTokenResponse, error) {
+func (a *azureController) getToken(ctx context.Context, req *proto.GetTokenRequest) (*proto.GetTokenResponse, error) {
 
 	kc, err := a.kubeConfig(ctx, &proto.GetKubeConfigRequest{
 		Provider:    req.Provider,
@@ -52,7 +52,7 @@ func (a *AzureController) getToken(ctx context.Context, req *proto.GetTokenReque
 	})
 
 	if err != nil {
-		a.logger.Errorw("failed to get kube config", "error", err)
+		a.logger.Error(ctx, "failed to get kube config", "error", err)
 		return nil, errors.Wrap(err, "getToken: failed to get kube config")
 	}
 
@@ -60,7 +60,7 @@ func (a *AzureController) getToken(ctx context.Context, req *proto.GetTokenReque
 	var kconf kubeconfig.KubectlConfig
 	err = yaml.NewYAMLToJSONDecoder(bytes.NewReader(kc)).Decode(&kconf)
 	if err != nil {
-		a.logger.Errorw("failed to unmarshall kube file", "error", err)
+		a.logger.Error(ctx, "failed to unmarshall kube file", "error", err)
 		return nil, errors.Wrap(err, "getToken: ")
 	}
 
@@ -74,10 +74,10 @@ func (a *AzureController) getToken(ctx context.Context, req *proto.GetTokenReque
 	}, nil
 }
 
-func (a *AzureController) getKubeConfig(ctx context.Context, req *proto.GetKubeConfigRequest) (*proto.GetKubeConfigResponse, error) {
+func (a *azureController) getKubeConfig(ctx context.Context, req *proto.GetKubeConfigRequest) (*proto.GetKubeConfigResponse, error) {
 	kc, err := a.kubeConfig(ctx, req)
 	if err != nil {
-		a.logger.Errorw("failed to get kube config", "error", err)
+		a.logger.Error(ctx, "failed to get kube config", "error", err)
 		return nil, errors.Wrap(err, "getKubeConfig: failed to get kube config")
 	}
 

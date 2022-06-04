@@ -19,7 +19,20 @@ func diskName(size int32) string {
 	return fmt.Sprintf("vol-%d-%s", size, t)
 }
 
-func (a *AzureController) createVolume(ctx context.Context, req *proto.CreateVolumeRequest) (*proto.CreateVolumeResponse, error) {
+func getDiskSku(vt string) (*compute.DiskSku, error) {
+	ds := &compute.DiskSku{}
+	// Doc : https://docs.microsoft.com/en-us/rest/api/compute/disks/create-or-update#diskstorageaccounttypes
+	switch vt {
+	case "Premium_LRS", "Premium_ZRS", "StandardSSD_LRS", "StandardSSD_ZRS", "Standard_LRS", "UltraSSD_LRS":
+		ds.Name = compute.DiskStorageAccountTypes(vt)
+		ds.Tier = &vt
+	default:
+		return nil, errors.Errorf("invalid volume type '%s'", vt)
+	}
+	return ds, nil
+}
+
+func (a *azureController) createVolume(ctx context.Context, req *proto.CreateVolumeRequest) (*proto.CreateVolumeResponse, error) {
 
 	account := req.AccountName
 
@@ -29,14 +42,14 @@ func (a *AzureController) createVolume(ctx context.Context, req *proto.CreateVol
 	}
 	disksClient, err := getDisksClient(cred)
 	if err != nil {
-		a.logger.Errorw("failed to get the disk client", "error", err)
+		a.logger.Error(ctx, "failed to get the disk client", "error", err)
 		return nil, err
 	}
 	size := int32(req.GetSize())
 	name := diskName(size)
 	tags := labels.DefaultTags()
 
-	a.logger.Infow("creating disk", "name", name, "size", req.Size)
+	a.logger.Info(ctx, "creating disk", "name", name, "size", req.Size)
 
 	//if snapshotId is provided
 
@@ -54,17 +67,18 @@ func (a *AzureController) createVolume(ctx context.Context, req *proto.CreateVol
 		}
 	}
 
+	sku, err := getDiskSku(req.Volumetype)
+	if err != nil {
+		return nil, errors.Wrap(err, "createVolume: failed get disk SKU")
+	}
+
 	// Doc : https://docs.microsoft.com/en-us/rest/api/compute/disks/create-or-update
 	future, err := disksClient.CreateOrUpdate(
 		ctx,
 		cred.ResourceGroup,
 		name,
 		compute.Disk{
-			Sku: &compute.DiskSku{
-				// Doc : https://docs.microsoft.com/en-us/rest/api/compute/disks/create-or-update#diskstorageaccounttypes
-				Name: "StandardSSD_LRS",
-				Tier: to.StringPtr("StandardSSD_LRS"),
-			},
+			Sku:      sku,
 			Location: to.StringPtr(req.Region),
 			DiskProperties: &compute.DiskProperties{
 				CreationData: creationData,
@@ -76,7 +90,7 @@ func (a *AzureController) createVolume(ctx context.Context, req *proto.CreateVol
 		return nil, errors.Wrap(err, "createDisk: aks call failed")
 	}
 
-	a.logger.Debugw("waiting on the future response")
+	a.logger.Debug(ctx, "waiting on the future response")
 	err = future.WaitForCompletionRef(ctx, disksClient.Client)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot get the disk create or update future response")
@@ -99,27 +113,27 @@ func (a *AzureController) createVolume(ctx context.Context, req *proto.CreateVol
 			ctx, cancel := context.WithTimeout(context.Background(), azureDeleteSnapshotTimeout)
 			defer cancel()
 
-			a.logger.Infow("deleting snapshot", "ID", req.Snapshotid)
+			a.logger.Info(ctx, "deleting snapshot", "ID", req.Snapshotid)
 			sc, err := getSnapshotClient(cred)
 			if err != nil {
-				a.logger.Errorw("failed to get the snapshot client", "error", err)
+				a.logger.Error(ctx, "failed to get the snapshot client", "error", err)
 				return
 			}
 
-			err = a.deleteSnapshot(ctx, sc, cred.ResourceGroup, req.Snapshotid)
+			err = a.deleteSnapshotInternal(ctx, sc, cred.ResourceGroup, req.Snapshotid)
 			if err != nil {
 				//we will silently log error and return here for now, we dont want to tell the user that volume creation failed in this case.
-				a.logger.Errorw("failed to delete the snapshot", "error", err)
+				a.logger.Error(ctx, "failed to delete the snapshot", "error", err)
 				return
 			}
-			a.logger.Infow("snapshot deleted", "ID", req.Snapshotid)
+			a.logger.Info(ctx, "snapshot deleted", "ID", req.Snapshotid)
 		}()
 	}
 	return ret, nil
 
 }
 
-func (a *AzureController) deleteDisk(ctx context.Context, dc *compute.DisksClient, groupName, name string) error {
+func (a *azureController) deleteDisk(ctx context.Context, dc *compute.DisksClient, groupName, name string) error {
 
 	// Doc : https://docs.microsoft.com/en-us/rest/api/compute/disks/delete
 	future, err := dc.Delete(
@@ -131,7 +145,7 @@ func (a *AzureController) deleteDisk(ctx context.Context, dc *compute.DisksClien
 		return errors.Wrap(err, "deleteDisk: aks call failed")
 	}
 
-	a.logger.Debugw("waiting on the delete disk future response")
+	a.logger.Debug(ctx, "waiting on the delete disk future response")
 	err = future.WaitForCompletionRef(ctx, dc.Client)
 	if err != nil {
 		return errors.Wrap(err, "cannot get the disk delete response")
@@ -148,7 +162,7 @@ func (a *AzureController) deleteDisk(ctx context.Context, dc *compute.DisksClien
 	return nil
 }
 
-func (a *AzureController) deleteVolume(ctx context.Context, req *proto.DeleteVolumeRequest) (*proto.DeleteVolumeResponse, error) {
+func (a *azureController) deleteVolume(ctx context.Context, req *proto.DeleteVolumeRequest) (*proto.DeleteVolumeResponse, error) {
 
 	name := req.Volumeid
 
@@ -160,11 +174,11 @@ func (a *AzureController) deleteVolume(ctx context.Context, req *proto.DeleteVol
 	}
 	disksClient, err := getDisksClient(cred)
 	if err != nil {
-		a.logger.Errorw("failed to get the disk client", "error", err)
+		a.logger.Error(ctx, "failed to get the disk client", "error", err)
 		return nil, err
 	}
 
-	a.logger.Infow("deleting disk", "name", name)
+	a.logger.Info(ctx, "deleting disk", "name", name)
 	err = a.deleteDisk(ctx, disksClient, cred.ResourceGroup, name)
 	if err != nil {
 		return nil, err

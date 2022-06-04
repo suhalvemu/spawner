@@ -111,6 +111,11 @@ func (g *gateway) GetWorkspacesCost(ctx context.Context, req *proto.GetWorkspace
 	return g.service.GetWorkspacesCost(ctx, req)
 }
 
+//GetApplicationsCost
+func (g *gateway) GetApplicationsCost(ctx context.Context, req *proto.GetApplicationsCostRequest) (*proto.GetApplicationsCostResponse, error) {
+	return g.service.GetApplicationsCost(ctx, req)
+}
+
 //WriteCredential save user account credential
 func (g *gateway) WriteCredential(ctx context.Context, req *proto.WriteCredentialRequest) (*proto.WriteCredentialResponse, error) {
 	return g.service.WriteCredential(ctx, req)
@@ -129,4 +134,21 @@ func (g *gateway) GetKubeConfig(ctx context.Context, req *proto.GetKubeConfigReq
 //TagNodeInstance tag underlying vm instances for cluster nodes
 func (g *gateway) TagNodeInstance(ctx context.Context, req *proto.TagNodeInstanceRequest) (*proto.TagNodeInstanceResponse, error) {
 	return g.service.TagNodeInstance(ctx, req)
+}
+
+//GetCostByTime
+func (g *gateway) GetCostByTime(ctx context.Context, req *proto.GetCostByTimeRequest) (*proto.GetCostByTimeResponse, error) {
+	return g.service.GetCostByTime(ctx, req)
+}
+
+func (g *gateway) GetContainerRegistryAuth(ctx context.Context, in *proto.GetContainerRegistryAuthRequest) (*proto.GetContainerRegistryAuthResponse, error) {
+	return g.service.GetContainerRegistryAuth(ctx, in)
+}
+
+func (g *gateway) CreateContainerRegistryRepo(ctx context.Context, in *proto.CreateContainerRegistryRepoRequest) (*proto.CreateContainerRegistryRepoResponse, error) {
+	return g.service.CreateContainerRegistryRepo(ctx, in)
+}
+
+func (g *gateway) DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (*proto.DeleteSnapshotResponse, error) {
+	return g.service.DeleteSnapshot(ctx, req)
 }

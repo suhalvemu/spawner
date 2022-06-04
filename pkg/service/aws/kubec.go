@@ -9,7 +9,7 @@ import (
 )
 
 //GetKubeConfig generates the kubeconfig from the session
-func (ctrl AWSController) GetKubeConfig(ctx context.Context, req *proto.GetKubeConfigRequest) (*proto.GetKubeConfigResponse, error) {
+func (ctrl awsController) GetKubeConfig(ctx context.Context, req *proto.GetKubeConfigRequest) (*proto.GetKubeConfigResponse, error) {
 
 	region := req.Region
 	clusterName := req.ClusterName
@@ -19,18 +19,18 @@ func (ctrl AWSController) GetKubeConfig(ctx context.Context, req *proto.GetKubeC
 		return nil, err
 	}
 	client := session.getEksClient()
-	ctrl.logger.Debugw("fetching cluster status", "cluster", clusterName, "region", region)
+	ctrl.logger.Debug(ctx, "fetching cluster status", "cluster", clusterName, "region", region)
 
 	cluster, err := getClusterSpec(ctx, client, clusterName)
 	if err != nil {
-		ctrl.logger.Errorw("failed to get cluster spec", "error", err, "cluster", clusterName, "region", region)
+		ctrl.logger.Error(ctx, "failed to get cluster spec", "error", err, "cluster", clusterName, "region", region)
 		return nil, err
 	}
 
 	kubeConfig, err := session.getKubeConfig(cluster)
 
 	if err != nil {
-		ctrl.logger.Errorw("failed to get k8s config", "error", err, "cluster", clusterName, "region", region)
+		ctrl.logger.Error(ctx, "failed to get k8s config", "error", err, "cluster", clusterName, "region", region)
 		return nil, err
 	}
 
@@ -49,16 +49,22 @@ func (ctrl AWSController) GetKubeConfig(ctx context.Context, req *proto.GetKubeC
 	}
 
 	authinfos := make(map[string]*clientcmdapi.AuthInfo)
-	authinfos[defaultCluster] = &clientcmdapi.AuthInfo{
-		Exec: &clientcmdapi.ExecConfig{
-			Command: "aws",
-			Args: []string{
-				"--region", region,
-				"eks", "get-token",
-				"--cluster-name", clusterName,
+	if req.RawToken {
+		authinfos[defaultCluster] = &clientcmdapi.AuthInfo{
+			Token: kubeConfig.BearerToken,
+		}
+	} else {
+		authinfos[defaultCluster] = &clientcmdapi.AuthInfo{
+			Exec: &clientcmdapi.ExecConfig{
+				Command: "aws",
+				Args: []string{
+					"--region", region,
+					"eks", "get-token",
+					"--cluster-name", clusterName,
+				},
+				APIVersion: "client.authentication.k8s.io/v1alpha1",
 			},
-			APIVersion: "client.authentication.k8s.io/v1alpha1",
-		},
+		}
 	}
 
 	clientConfig := clientcmdapi.Config{
@@ -77,7 +83,7 @@ func (ctrl AWSController) GetKubeConfig(ctx context.Context, req *proto.GetKubeC
 }
 
 //GetToken get aws tokens and ca data for kube
-func (ctrl AWSController) GetToken(ctx context.Context, req *proto.GetTokenRequest) (*proto.GetTokenResponse, error) {
+func (ctrl awsController) GetToken(ctx context.Context, req *proto.GetTokenRequest) (*proto.GetTokenResponse, error) {
 
 	region := req.Region
 	clusterName := req.ClusterName
@@ -87,17 +93,17 @@ func (ctrl AWSController) GetToken(ctx context.Context, req *proto.GetTokenReque
 		return nil, err
 	}
 	client := session.getEksClient()
-	ctrl.logger.Debugw("fetching cluster status", "cluster", clusterName, "region", region)
+	ctrl.logger.Debug(ctx, "fetching cluster status", "cluster", clusterName, "region", region)
 
 	cluster, err := getClusterSpec(ctx, client, clusterName)
 	if err != nil {
-		ctrl.logger.Errorw("failed to get cluster spec", "error", err, "cluster", clusterName, "region", region)
+		ctrl.logger.Error(ctx, "failed to get cluster spec", "error", err, "cluster", clusterName, "region", region)
 		return nil, err
 	}
 
 	kubeConfig, err := session.getKubeConfig(cluster)
 	if err != nil {
-		ctrl.logger.Errorw("failed to get k8s config", "error", err, "cluster", clusterName, "region", region)
+		ctrl.logger.Error(ctx, "failed to get k8s config", "error", err, "cluster", clusterName, "region", region)
 		return nil, err
 	}
 	return &proto.GetTokenResponse{

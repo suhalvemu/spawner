@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"go.uber.org/zap"
+	"github.com/netbookai/log"
 
 	rnchrClient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	aws "gitlab.com/netbook-devs/spawner-service/pkg/service/aws"
@@ -32,8 +32,10 @@ type SpawnerService interface {
 	CreateVolume(ctx context.Context, req *proto.CreateVolumeRequest) (*proto.CreateVolumeResponse, error)
 	DeleteVolume(ctx context.Context, req *proto.DeleteVolumeRequest) (*proto.DeleteVolumeResponse, error)
 	CreateSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (*proto.CreateSnapshotResponse, error)
+	DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (*proto.DeleteSnapshotResponse, error)
 	CreateSnapshotAndDelete(ctx context.Context, req *proto.CreateSnapshotAndDeleteRequest) (*proto.CreateSnapshotAndDeleteResponse, error)
 	GetWorkspacesCost(context.Context, *proto.GetWorkspacesCostRequest) (*proto.GetWorkspacesCostResponse, error)
+	GetApplicationsCost(context.Context, *proto.GetApplicationsCostRequest) (*proto.GetApplicationsCostResponse, error)
 	GetKubeConfig(ctx context.Context, in *proto.GetKubeConfigRequest) (*proto.GetKubeConfigResponse, error)
 	TagNodeInstance(ctx context.Context, req *proto.TagNodeInstanceRequest) (*proto.TagNodeInstanceResponse, error)
 
@@ -41,19 +43,23 @@ type SpawnerService interface {
 	WriteCredential(context.Context, *proto.WriteCredentialRequest) (*proto.WriteCredentialResponse, error)
 	ReadCredential(context.Context, *proto.ReadCredentialRequest) (*proto.ReadCredentialResponse, error)
 	AddRoute53Record(ctx context.Context, req *proto.AddRoute53RecordRequest) (*proto.AddRoute53RecordResponse, error)
+	GetCostByTime(ctx context.Context, req *proto.GetCostByTimeRequest) (*proto.GetCostByTimeResponse, error)
+
+	GetContainerRegistryAuth(ctx context.Context, in *proto.GetContainerRegistryAuthRequest) (*proto.GetContainerRegistryAuthResponse, error)
+	CreateContainerRegistryRepo(ctx context.Context, in *proto.CreateContainerRegistryRepoRequest) (*proto.CreateContainerRegistryRepoResponse, error)
 }
 
 //spawnerService manage provider and clusters
 type spawnerService struct {
 	awsController   Controller
 	azureController Controller
-	logger          *zap.SugaredLogger
+	logger          log.Logger
 
 	proto.UnimplementedSpawnerServiceServer
 }
 
 //New return ClusterController
-func New(logger *zap.SugaredLogger) SpawnerService {
+func New(logger log.Logger) SpawnerService {
 
 	svc := &spawnerService{
 		awsController:   aws.NewAWSController(logger),
@@ -202,17 +208,26 @@ func (s *spawnerService) GetWorkspacesCost(ctx context.Context, req *proto.GetWo
 	return provider.GetWorkspacesCost(ctx, req)
 }
 
+//GetApplicationsCost returns workspace cost grouped by given group
+func (s *spawnerService) GetApplicationsCost(ctx context.Context, req *proto.GetApplicationsCostRequest) (*proto.GetApplicationsCostResponse, error) {
+	provider, err := s.controller(req.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return provider.GetApplicationsCost(ctx, req)
+}
+
 //RegisterWithRancher register cluster on the rancher, returns the kube manifest to apply on the cluster
 func (s *spawnerService) RegisterWithRancher(ctx context.Context, req *proto.RancherRegistrationRequest) (*proto.RancherRegistrationResponse, error) {
 
 	clusterName := req.ClusterName
-	s.logger.Info("registering cluster with rancher ", req.ClusterName)
+	s.logger.Info(ctx, "registering cluster with rancher ", "cluster", req.ClusterName)
 
 	conf := config.Get()
 	client, err := rancher.CreateRancherClient(conf.RancherAddr, conf.RancherUsername, conf.RancherPassword)
 
 	if err != nil {
-		s.logger.Error("failed to get rancher client ", client)
+		s.logger.Error(ctx, "failed to get rancher client ", client)
 
 		return nil, err
 	}
@@ -228,7 +243,7 @@ func (s *spawnerService) RegisterWithRancher(ctx context.Context, req *proto.Ran
 	registeredCluster, err := client.Cluster.Create(&regCluster)
 
 	if err != nil {
-		s.logger.Errorf("failed to create a rancher cluster '%s' %s", clusterName, err.Error())
+		s.logger.Error(ctx, "failed to create a rancher cluster", "cluster", clusterName, "error", err.Error())
 		return nil, err
 	}
 
@@ -240,10 +255,10 @@ func (s *spawnerService) RegisterWithRancher(ctx context.Context, req *proto.Ran
 		//TODO: we may want to revert the creation process,
 		//but we will keep it now, so we can manually deal with the registration in case of failure.
 
-		s.logger.Errorf("failed to fetch registration token for '%s' %s", clusterName, err.Error())
+		s.logger.Error(ctx, "failed to fetch registration token ", "cluster", clusterName, "error", err.Error())
 		return nil, err
 	}
-	s.logger.Infof("cluster created on the rancher, apply the manifest file on the target cluster '%s'", registrationToken.ManifestURL)
+	s.logger.Info(ctx, "cluster created on the rancher, apply the manifest file on the target cluster", "manifest-url", registrationToken.ManifestURL)
 
 	return &proto.RancherRegistrationResponse{
 		ClusterName: registeredCluster.Name,
@@ -253,20 +268,32 @@ func (s *spawnerService) RegisterWithRancher(ctx context.Context, req *proto.Ran
 
 }
 
+func validCredType(ct string) bool {
+	switch ct {
+	case constants.CredAws, constants.CredAzure, constants.CredGitPat:
+		return true
+	}
+	return false
+}
+
 //WriteCredential
 func (s *spawnerService) WriteCredential(ctx context.Context, req *proto.WriteCredentialRequest) (*proto.WriteCredentialResponse, error) {
 
 	account := req.GetAccount()
 	region := config.Get().SecretHostRegion
 
-	provider := req.GetProvider()
+	credType := req.GetType()
+
+	if !validCredType(credType) {
+		return nil, constants.ErrInvalidCredentiualType
+	}
 
 	var cred system.Credentials
 	cred_type := "unknown"
 
-	switch provider {
+	switch credType {
 
-	case constants.AwsLabel:
+	case constants.CredAws:
 
 		cred_type = "AwsCredential"
 		if c := req.GetAwsCred(); c != nil {
@@ -278,7 +305,7 @@ func (s *spawnerService) WriteCredential(ctx context.Context, req *proto.WriteCr
 			}
 		}
 
-	case constants.AzureLabel:
+	case constants.CredAzure:
 		cred_type = "AzureCredential"
 		if c := req.GetAzureCred(); c != nil {
 			cred = &system.AzureCredential{
@@ -290,18 +317,26 @@ func (s *spawnerService) WriteCredential(ctx context.Context, req *proto.WriteCr
 				Name:           account,
 			}
 		}
+	case constants.CredGitPat:
+		cred_type = "GithubPersonalAccessToken"
+		if c := req.GetGitPat(); c != nil {
+			cred = &system.GithubPersonalAccessToken{
+				Name:  account,
+				Token: c.Token,
+			}
+		}
 	default:
-		return nil, fmt.Errorf("invalid provider '%s'", provider)
+		return nil, fmt.Errorf("invalid provider '%s'", credType)
 	}
 
 	if cred == nil {
-		return nil, fmt.Errorf(" %s credentials must be set for provider %s", cred_type, provider)
+		return nil, fmt.Errorf(" %s credentials must be set for type '%s'", cred_type, credType)
 
 	}
 
-	err := s.writeCredentials(ctx, region, account, provider, cred)
+	err := s.writeCredentials(ctx, region, account, credType, cred)
 	if err != nil {
-		s.logger.Errorw("failed to save credentials", "error", err, "account", account)
+		s.logger.Error(ctx, "failed to save credentials", "error", err, "account", account)
 		return nil, err
 	}
 	return &proto.WriteCredentialResponse{}, nil
@@ -313,20 +348,23 @@ func (s *spawnerService) ReadCredential(ctx context.Context, req *proto.ReadCred
 
 	region := config.Get().SecretHostRegion
 	account := req.GetAccount()
-	provider := req.GetProvider()
+	credType := req.GetType()
 
-	creds, err := s.getCredentials(ctx, region, account, provider)
+	if !validCredType(credType) {
+		return nil, constants.ErrInvalidCredentiualType
+	}
+
+	creds, err := s.getCredentials(ctx, region, account, credType)
 	if err != nil {
-		s.logger.Errorw("failed to get the credentials", "account", account)
+		s.logger.Error(ctx, "failed to get the credentials", "account", account, "error", err)
 		return nil, err
 	}
 	p := &proto.ReadCredentialResponse{
 		Account: account,
 	}
 
-	switch provider {
-	case constants.AwsLabel:
-
+	switch credType {
+	case constants.CredAws:
 		c := creds.GetAws()
 		p.Cred = &proto.ReadCredentialResponse_AwsCred{
 			AwsCred: &proto.AwsCredentials{
@@ -335,7 +373,8 @@ func (s *spawnerService) ReadCredential(ctx context.Context, req *proto.ReadCred
 				Token:           c.Token,
 			},
 		}
-	case constants.AzureLabel:
+
+	case constants.CredAzure:
 		c := creds.GetAzure()
 		p.Cred = &proto.ReadCredentialResponse_AzureCred{
 			AzureCred: &proto.AzureCredentials{
@@ -346,9 +385,17 @@ func (s *spawnerService) ReadCredential(ctx context.Context, req *proto.ReadCred
 				ResourceGroup:  c.ResourceGroup,
 			},
 		}
+
+	case constants.CredGitPat:
+		c := creds.GetGitPAT()
+		p.Cred = &proto.ReadCredentialResponse_GitPat{
+			GitPat: &proto.GithubPersonalAccessToken{
+				Token: c.Token,
+			},
+		}
 	}
 
-	s.logger.Debugw("credentials found", "account", account, "provider", provider)
+	s.logger.Debug(ctx, "credentials found", "account", account, "credential_type", credType)
 	return p, nil
 }
 
@@ -362,10 +409,10 @@ func (s *spawnerService) AddRoute53Record(ctx context.Context, req *proto.AddRou
 
 	changeId, err := s.addRoute53Record(ctx, dnsName, recordName, regionName, isAwsResource)
 	if err != nil {
-		s.logger.Errorw("failed to add route53 record", "error", err)
+		s.logger.Error(ctx, "failed to add route53 record", "error", err)
 		return nil, err
 	}
-	s.logger.Infow("added route 53 record", "change-id", changeId)
+	s.logger.Info(ctx, "added route 53 record", "change-id", changeId)
 	return &proto.AddRoute53RecordResponse{}, nil
 }
 
@@ -383,4 +430,38 @@ func (s *spawnerService) TagNodeInstance(ctx context.Context, req *proto.TagNode
 		return nil, err
 	}
 	return provider.TagNodeInstance(ctx, req)
+}
+
+//GetWorkspaceCost returns filtered cost grouped by given group and time
+func (s *spawnerService) GetCostByTime(ctx context.Context, req *proto.GetCostByTimeRequest) (*proto.GetCostByTimeResponse, error) {
+	provider, err := s.controller(req.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return provider.GetCostByTime(ctx, req)
+}
+
+func (s *spawnerService) GetContainerRegistryAuth(ctx context.Context, req *proto.GetContainerRegistryAuthRequest) (*proto.GetContainerRegistryAuthResponse, error) {
+
+	provider, err := s.controller(req.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return provider.GetContainerRegistryAuth(ctx, req)
+}
+
+func (s *spawnerService) CreateContainerRegistryRepo(ctx context.Context, req *proto.CreateContainerRegistryRepoRequest) (*proto.CreateContainerRegistryRepoResponse, error) {
+	provider, err := s.controller(req.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return provider.CreateContainerRegistryRepo(ctx, req)
+}
+
+func (s *spawnerService) DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (*proto.DeleteSnapshotResponse, error) {
+	provider, err := s.controller(req.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return provider.DeleteSnapshot(ctx, req)
 }

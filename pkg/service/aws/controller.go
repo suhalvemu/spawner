@@ -3,9 +3,9 @@ package aws
 import (
 	"context"
 
+	"github.com/netbookai/log"
 	"github.com/pkg/errors"
 	proto "gitlab.com/netbook-devs/spawner-service/proto/netbookai/spawner"
-	"go.uber.org/zap"
 )
 
 const (
@@ -29,18 +29,18 @@ var (
 	ERR_NO_NODEGROUP    = errors.New("no nodegroup exist in cluster")
 )
 
-type AWSController struct {
-	logger *zap.SugaredLogger
+type awsController struct {
+	logger log.Logger
 }
 
 //NewAWSController
-func NewAWSController(logger *zap.SugaredLogger) *AWSController {
-	return &AWSController{
+func NewAWSController(logger log.Logger) *awsController {
+	return &awsController{
 		logger: logger,
 	}
 }
 
 //AddToken deprecated
-func (ctrl AWSController) AddToken(ctx context.Context, req *proto.AddTokenRequest) (*proto.AddTokenResponse, error) {
+func (ctrl awsController) AddToken(ctx context.Context, req *proto.AddTokenRequest) (*proto.AddTokenResponse, error) {
 	return &proto.AddTokenResponse{}, nil
 }
