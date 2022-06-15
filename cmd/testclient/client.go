@@ -16,13 +16,13 @@ import (
 )
 
 const (
-	clusterName = "kubeflow"
-	region      = "eastus2" //"us-west-2"
-	provider    = "azure"
+	clusterName = "gcp-cluster-test-3"
+	region      = "us-central1" //"eastus2" //"us-west-2"
+	provider    = "gcp"
+	nodeName    = "add-node-2"
+	instance    = "e2-medium"
+	volumeName  = "vol-50-20220607164454"
 	accountName = "netbook-aws"
-	nodeName    = "rootnode"
-	instance    = "Standard_A2_v2"
-	volumeName  = "vol-50-20220603121711"
 )
 
 func main() {
@@ -92,6 +92,44 @@ func main() {
 		// RegionIdentifier: "Oregon region",
 	}
 
+	getRoute53Req := &proto.GetRoute53TXTRecordsRequest{}
+
+	deleteRoute53Req := &proto.DeleteRoute53RecordsRequest{
+		Records: []*proto.Route53ResourceRecordSet{
+			{
+				Type: "TXT",
+				Name: "ash1234.app.dev.netbook.ai",
+				ResourceRecords: []*proto.Route53ResourceRecord{
+					{
+						Value: "test1",
+					},
+					{
+						Value: "test2",
+					},
+				},
+				TtlInSeconds: 250,
+			},
+		},
+	}
+
+	createRoute53RecordsReq := &proto.CreateRoute53RecordsRequest{
+		Records: []*proto.Route53ResourceRecordSet{
+			{
+				Type: "TXT",
+				Name: "ash1234.app.dev.netbook.ai",
+				ResourceRecords: []*proto.Route53ResourceRecord{
+					{
+						Value: "test1",
+					},
+					{
+						Value: "test2",
+					},
+				},
+				TtlInSeconds: 250,
+			},
+		},
+	}
+
 	clusterStatusReq := &proto.ClusterStatusRequest{
 		ClusterName: clusterName,
 		Region:      region,
@@ -114,9 +152,10 @@ func main() {
 
 	addNode := &proto.NodeSpec{
 		Name:          nodeName,
+		Count:         5,
 		Instance:      instance,
 		MigProfile:    proto.MIGProfile_MIG3g,
-		CapacityType:  proto.CapacityType_SPOT,
+		CapacityType:  proto.CapacityType_ONDEMAND,
 		MachineType:   "m",
 		SpotInstances: []string{"t2.small", "t3.small"},
 		DiskSize:      20,
@@ -156,11 +195,12 @@ func main() {
 		Availabilityzone: region,
 		Volumetype:       "StandardSSD_LRS", //"gp2",
 		Size:             50,
-		//	Snapshotid:       "vol-30-20220409151829-snapshot",
+		Snapshotid:       "vol-50-20220607152827-snapshot",
 		//SnapshotUri: "snapshot-uri",
-		Region:      region,
-		Provider:    provider,
-		AccountName: accountName,
+		Region:         region,
+		Provider:       provider,
+		AccountName:    accountName,
+		DeleteSnapshot: true,
 	}
 
 	deleteVolumeReq := &proto.DeleteVolumeRequest{
@@ -393,7 +433,7 @@ func main() {
 			Provider:    provider,
 			Region:      region,
 			AccountName: accountName,
-			SnapshotId:  "vol-50-20220603121711-snapshot",
+			SnapshotId:  fmt.Sprintf("%s-snapshot", volumeName),
 		})
 
 		if err != nil {
@@ -563,6 +603,44 @@ func main() {
 			os.Exit(1)
 		}
 		sugar.Infow("CreateContainerRegistryRepo: created repo", "response", v)
+
+	case "RegisterClusterOIDC":
+		v, err := client.RegisterClusterOIDC(context.Background(), &proto.RegisterClusterOIDCRequest{
+			Provider:    "aws",
+			Region:      region,
+			AccountName: accountName,
+			ClusterName: clusterName,
+		})
+
+		if err != nil {
+			sugar.Errorw("error connecting cluster oidc to policy", "error", err)
+			os.Exit(1)
+		}
+		sugar.Infow("ConnectClusterOIDCToTrustPolicy : connect cluster to oidc", "response", v)
+
+	case "GetRoute53TXTRecords":
+		v, err := client.GetRoute53TXTRecords(context.Background(), getRoute53Req)
+		if err != nil {
+			sugar.Errorw("error getting route53 records", "error", err)
+			os.Exit(1)
+		}
+		sugar.Infow("Route53 Records", "response", v)
+
+	case "DeleteRoute53Records":
+		v, err := client.DeleteRoute53Records(context.Background(), deleteRoute53Req)
+		if err != nil {
+			sugar.Errorw("error deleting route53 records", "error", err)
+			os.Exit(1)
+		}
+		sugar.Infow("Route53 records deleted successfully", "response", v)
+
+	case "CreateRoute53Records":
+		v, err := client.CreateRoute53Records(context.Background(), createRoute53RecordsReq)
+		if err != nil {
+			sugar.Errorw("error appending route53 records", "error", err)
+			os.Exit(1)
+		}
+		sugar.Infow("Route53 records created successfully", "response", v)
 
 	default:
 		sugar.Infow("error: invalid method", "method", *method)

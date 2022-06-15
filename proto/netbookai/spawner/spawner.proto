@@ -81,6 +81,18 @@ service SpawnerService {
 
   rpc CreateContainerRegistryRepo(CreateContainerRegistryRepoRequest)
       returns (CreateContainerRegistryRepoResponse) {}
+
+  rpc RegisterClusterOIDC(RegisterClusterOIDCRequest)
+      returns (RegisterClusterOIDCResponse) {}
+
+  rpc CreateRoute53Records(CreateRoute53RecordsRequest)
+      returns (CreateRoute53RecordsResponse) {}
+
+  rpc GetRoute53TXTRecords(GetRoute53TXTRecordsRequest)
+      returns (GetRoute53TXTRecordsResponse) {}
+
+  rpc DeleteRoute53Records(DeleteRoute53RecordsRequest)
+      returns (DeleteRoute53RecordsResponse) {}
 }
 
 message Empty {}
@@ -393,6 +405,11 @@ message GithubPersonalAccessToken {
   string token = 1;
 }
 
+message GcpCredentials {
+  string projectID = 1;
+  string certificate = 2;
+}
+
 message WriteCredentialRequest {
   string account = 1;
   string provider = 2 [deprecated = true];
@@ -401,6 +418,7 @@ message WriteCredentialRequest {
     AwsCredentials awsCred = 3;
     AzureCredentials azureCred = 4;
     GithubPersonalAccessToken gitPat = 6;
+    GcpCredentials gcpCred = 7;
   }
 }
 
@@ -422,6 +440,7 @@ message ReadCredentialResponse {
     AwsCredentials awsCred = 3;
     AzureCredentials azureCred = 4;
     GithubPersonalAccessToken gitPat = 6;
+    GcpCredentials gcpCred = 7;
   }
 }
 
@@ -496,3 +515,42 @@ message DeleteSnapshotRequest {
   string snapshotId = 4;
 }
 message DeleteSnapshotResponse {}
+
+message RegisterClusterOIDCRequest {
+  string provider = 1;
+  string region = 2;
+  string accountName = 3;
+  string clusterName = 4;
+}
+
+message RegisterClusterOIDCResponse {}
+
+message Route53ResourceRecordSet {
+  //provide fqdn
+  string name = 1;
+  string type = 2;
+  int64 ttlInSeconds = 3;
+  repeated Route53ResourceRecord resourceRecords = 4;
+}
+
+message Route53ResourceRecord{
+  string value = 1;
+}
+
+message CreateRoute53RecordsRequest {
+  repeated Route53ResourceRecordSet records = 1;
+}
+
+message CreateRoute53RecordsResponse {}
+
+message GetRoute53TXTRecordsRequest {}
+
+message GetRoute53TXTRecordsResponse {
+  repeated Route53ResourceRecordSet records = 1;
+}
+
+message DeleteRoute53RecordsRequest {
+  repeated Route53ResourceRecordSet records = 1;
+}
+
+message DeleteRoute53RecordsResponse {}
