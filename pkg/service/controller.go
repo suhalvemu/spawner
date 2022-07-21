@@ -22,6 +22,7 @@ type Controller interface {
 	CreateSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (*proto.CreateSnapshotResponse, error)
 	DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (*proto.DeleteSnapshotResponse, error)
 	CreateSnapshotAndDelete(ctx context.Context, req *proto.CreateSnapshotAndDeleteRequest) (*proto.CreateSnapshotAndDeleteResponse, error)
+	CopySnapshot(ctx context.Context, in *proto.CopySnapshotRequest) (*proto.CopySnapshotResponse, error)
 	GetKubeConfig(ctx context.Context, in *proto.GetKubeConfigRequest) (*proto.GetKubeConfigResponse, error)
 	TagNodeInstance(ctx context.Context, req *proto.TagNodeInstanceRequest) (*proto.TagNodeInstanceResponse, error)
 
@@ -32,4 +33,6 @@ type Controller interface {
 	CreateContainerRegistryRepo(ctx context.Context, in *proto.CreateContainerRegistryRepoRequest) (*proto.CreateContainerRegistryRepoResponse, error)
 
 	RegisterClusterOIDC(ctx context.Context, in *proto.RegisterClusterOIDCRequest) (*proto.RegisterClusterOIDCResponse, error)
+
+	PresignS3Url(ctx context.Context, in *proto.PresignS3UrlRequest) (*proto.PresignS3UrlResponse, error)
 }

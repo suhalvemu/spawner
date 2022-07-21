@@ -104,3 +104,11 @@ func (a *azureController) DeleteSnapshot(ctx context.Context, req *proto.DeleteS
 func (a *azureController) RegisterClusterOIDC(ctx context.Context, in *proto.RegisterClusterOIDCRequest) (*proto.RegisterClusterOIDCResponse, error) {
 	return &proto.RegisterClusterOIDCResponse{}, nil
 }
+
+func (a *azureController) CopySnapshot(ctx context.Context, in *proto.CopySnapshotRequest) (*proto.CopySnapshotResponse, error) {
+	return a.copySnapshot(ctx, in)
+}
+
+func (a *azureController) PresignS3Url(ctx context.Context, in *proto.PresignS3UrlRequest) (*proto.PresignS3UrlResponse, error) {
+	return &proto.PresignS3UrlResponse{}, nil
+}

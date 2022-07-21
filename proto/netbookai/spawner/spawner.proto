@@ -93,6 +93,9 @@ service SpawnerService {
 
   rpc DeleteRoute53Records(DeleteRoute53RecordsRequest)
       returns (DeleteRoute53RecordsResponse) {}
+  rpc CopySnapshot(CopySnapshotRequest) returns (CopySnapshotResponse) {}
+
+  rpc PresignS3Url(PresignS3UrlRequest) returns (PresignS3UrlResponse) {}
 }
 
 message Empty {}
@@ -526,14 +529,14 @@ message RegisterClusterOIDCRequest {
 message RegisterClusterOIDCResponse {}
 
 message Route53ResourceRecordSet {
-  //provide fqdn
+  // provide fqdn
   string name = 1;
   string type = 2;
   int64 ttlInSeconds = 3;
   repeated Route53ResourceRecord resourceRecords = 4;
 }
 
-message Route53ResourceRecord{
+message Route53ResourceRecord {
   string value = 1;
 }
 
@@ -554,3 +557,29 @@ message DeleteRoute53RecordsRequest {
 }
 
 message DeleteRoute53RecordsResponse {}
+
+message CopySnapshotRequest {
+  string provider = 1;
+  string region = 2;
+  string accountName = 3;
+  string snapshotId = 4;
+  string snapshotUri = 5;
+  map<string, string> labels = 6;
+}
+
+message CopySnapshotResponse {
+  string newSnapshotId = 1;
+  string newSnapshotUri = 2;
+}
+
+message PresignS3UrlRequest {
+  string region = 1;
+  string accountName = 2;
+  string bucket = 3;
+  string file = 4;
+  int32 timeoutInMinute = 5;
+}
+
+message PresignS3UrlResponse {
+  string signedUrl = 1;
+}

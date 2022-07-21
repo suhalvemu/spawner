@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-12-01/compute"
 	"github.com/pkg/errors"
+	"gitlab.com/netbook-devs/spawner-service/pkg/service/common"
 	"gitlab.com/netbook-devs/spawner-service/pkg/service/labels"
 	proto "gitlab.com/netbook-devs/spawner-service/proto/netbookai/spawner"
 )
@@ -60,9 +61,8 @@ func (a *azureController) createDiskSnapshot(ctx context.Context, sc *compute.Sn
 
 func (a *azureController) createSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (*proto.CreateSnapshotResponse, error) {
 
-	name := fmt.Sprintf("%s-snapshot", req.Volumeid)
+	name := common.SnapshotDisplayName(req.Volumeid)
 	region := req.Region
-	tags := labels.DefaultTags()
 
 	account := req.AccountName
 
@@ -72,10 +72,8 @@ func (a *azureController) createSnapshot(ctx context.Context, req *proto.CreateS
 	}
 	groupName := cred.ResourceGroup
 
-	for k, v := range req.Labels {
-		v := v
-		tags[k] = &v
-	}
+	tags := labels.DefaultTags()
+	labels.MergeRequestLabel(tags, req.Labels)
 	dc, err := getDisksClient(cred)
 	if err != nil {
 		return nil, err
@@ -103,7 +101,7 @@ func (a *azureController) createSnapshot(ctx context.Context, req *proto.CreateS
 
 func (a *azureController) createSnapshotAndDelete(ctx context.Context, req *proto.CreateSnapshotAndDeleteRequest) (*proto.CreateSnapshotAndDeleteResponse, error) {
 
-	name := fmt.Sprintf("%s-snapshot", req.Volumeid)
+	name := common.SnapshotDisplayName(req.Volumeid)
 	region := req.Region
 
 	account := req.AccountName
@@ -114,11 +112,7 @@ func (a *azureController) createSnapshotAndDelete(ctx context.Context, req *prot
 		return nil, err
 	}
 	tags := labels.DefaultTags()
-
-	for k, v := range req.Labels {
-		v := v
-		tags[k] = &v
-	}
+	labels.MergeRequestLabel(tags, req.Labels)
 
 	dc, err := getDisksClient(cred)
 	if err != nil {
@@ -153,6 +147,12 @@ func (a *azureController) createSnapshotAndDelete(ctx context.Context, req *prot
 func (a *azureController) deleteSnapshotInternal(ctx context.Context, sc *compute.SnapshotsClient, groupName, snapshotId string) error {
 
 	future, err := sc.Delete(ctx, groupName, snapshotId)
+
+	if err != nil {
+
+		a.logger.Error(ctx, "failed to delete snapshot", "snapshot", snapshotId, "error", err)
+		return errors.Wrap(err, "failed to delete snapshot")
+	}
 	a.logger.Debug(ctx, "waiting on the delete snapshot future response")
 	err = future.WaitForCompletionRef(ctx, sc.Client)
 	if err != nil {
@@ -193,4 +193,58 @@ func (a *azureController) deleteSnapshot(ctx context.Context, req *proto.DeleteS
 	}
 	a.logger.Info(ctx, "snapshot deleted", "snapshotid", req.SnapshotId)
 	return &proto.DeleteSnapshotResponse{}, nil
+}
+
+func (a *azureController) copySnapshot(ctx context.Context, req *proto.CopySnapshotRequest) (*proto.CopySnapshotResponse, error) {
+
+	account := req.AccountName
+
+	cred, err := getCredentials(ctx, account)
+	if err != nil {
+		a.logger.Error(ctx, "failed to get the azure credentials", "error", err)
+		return nil, errors.Wrap(err, "copySnapshot")
+	}
+
+	sc, err := getSnapshotClient(cred)
+	if err != nil {
+		a.logger.Error(ctx, "faied to get the snapshot client", "error", err)
+		return nil, errors.Wrap(err, "copySnapshot")
+	}
+	name := common.CopySnapshotName(req.SnapshotId)
+	region := req.Region
+	uri := req.SnapshotUri
+	tags := labels.DefaultTags()
+	labels.MergeRequestLabel(tags, req.Labels)
+
+	res, err := sc.CreateOrUpdate(ctx, cred.ResourceGroup, name, compute.Snapshot{
+		SnapshotProperties: &compute.SnapshotProperties{
+			CreationData: &compute.CreationData{
+				CreateOption:     compute.DiskCreateOptionCopy,
+				SourceResourceID: &uri,
+			},
+		},
+		Location: &region,
+		Tags:     tags,
+	})
+	if err != nil {
+		a.logger.Error(ctx, "failed to copy snapshot", "error", err)
+		return nil, errors.Wrap(err, "createOrUpdate of snapshot failed")
+	}
+	a.logger.Info(ctx, "waiting on snapshot copy operation", "polling-url", res.PollingURL(), "status", res.Status())
+	err = res.WaitForCompletionRef(ctx, sc.Client)
+	if err != nil {
+		a.logger.Error(ctx, "failed to wait on copy snapshot", "error", err)
+		return nil, errors.Wrap(err, "wait on the operation failed")
+	}
+
+	snapshot, err := res.Result(*sc)
+	if err != nil {
+
+		a.logger.Error(ctx, "failed to get result of copy snapshot", "error", err)
+		return nil, errors.Wrap(err, "failed to get the result of operation")
+	}
+	return &proto.CopySnapshotResponse{
+		NewSnapshotId:  name,
+		NewSnapshotUri: *snapshot.ID,
+	}, nil
 }
